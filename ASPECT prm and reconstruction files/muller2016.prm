@@ -1,0 +1,207 @@
+# two composition: (background) harz and sediment
+
+
+set Additional shared libraries            = ./shared_libs_2/libcitcom_reference_comparison.release.so
+set CFL number                             = 0.3
+set End time                               = 2e8
+set Adiabatic surface temperature          = 1613.0
+set Use years in output instead of seconds = true
+set Timing output frequency                = 100
+set Nonlinear solver scheme                = single Advection, single Stokes
+
+set Output directory                       = output-muller2016_sediment_2composition
+set Dimension                              = 3
+set Resume computation                     = false
+
+subsection Boundary temperature model
+  set List of model names = spherical constant
+  subsection Spherical constant
+    set Inner temperature = 3700
+    set Outer temperature = 273
+  end
+end
+
+subsection Geometry model
+  set Model name = spherical shell
+
+  subsection Spherical shell
+    set Inner radius  = 3481000
+    set Opening angle = 360
+    set Outer radius  = 6371000
+  end
+end
+
+subsection Gravity model
+  set Model name = radial constant
+
+  subsection Radial constant
+    set Magnitude = 9.81
+  end
+end
+
+
+subsection Initial temperature model
+  set List of model names = adiabatic, citcom reference comparison
+  set List of model operators = maximum
+  subsection Adiabatic
+    set Top boundary layer age model = ascii data
+    set Data directory = ./data/
+    set Data file name = muller2016_age_200Ma.txt
+    set Age bottom boundary layer = 1.5e8
+    set Cooling model = half-space cooling
+    set Lithosphere thickness = 100e3
+    subsection Function
+      set Function expression = 1;0
+    end
+  end
+  subsection Citcom reference comparison
+    set Age top boundary layer = 2e8
+    set Age bottom boundary layer = 1.5e8
+    set dT = 800
+    set Thickness bottom boundary layer = 150000
+    subsection Function
+      set Function expression = 1;0
+    end
+  end
+end
+
+subsection Initial composition model
+  set Model name =  function
+
+  subsection Function
+    set Coordinate system =  spherical
+    set Variable names = r, phi, theta
+    set Function expression = 0.0; if( r>6271e3 && r<6364e3, 1, if( r>3681e3 && r<6271e3, 0.8, 0));
+  end
+end
+
+subsection Compositional fields
+  set Number of fields = 2
+  set Names of fields = Sediment_Thickness, Harzburgite
+end
+
+subsection Material model
+  set Model name = Steinberger
+  set Material averaging =  project to Q1 only viscosity 
+  subsection Steinberger model
+    set Data directory                   = ./data/
+    set Material file names              = morb-xu2008.txt, morb-xu2008.txt, harz-xu2008.txt
+    set Radial viscosity file name       = radial-visc-simple-2.txt
+    set Bilinear interpolation           = true
+    set Latent heat                      = false
+    set Use lateral average temperature for viscosity  = false
+    set Maximum viscosity                = 1.5e23
+    set Minimum viscosity                = 5e19
+
+    # This effectively means no special lateral limitation since 
+    # the global limitation above is smaller than this lateral value
+    set Maximum lateral viscosity variation = 1e4
+  end
+end
+
+subsection Boundary composition model
+  set Allow fixed composition on outflow boundaries = true
+  set Fixed composition boundary indicators = top
+  set Model name =  ascii data
+  subsection Ascii data model
+    set Data directory = ./data/Dutkiewicz_2017_G3_txt_2name/   # 180_360_muller2016
+    set Data file name = sedthick_%s.%03d.txt
+    set Data file time step = 1e6
+    set Decreasing file order = true    # decreasing the FileName
+    set First data file number = 200
+  end
+end
+
+
+subsection Mesh refinement
+  set Initial adaptive refinement        = 1
+
+  set Initial global refinement          = 4
+  set Minimum refinement level           = 3
+  set Refinement fraction                = 0.4
+  set Coarsening fraction                = 0.05
+
+  set Strategy                           = nonadiabatic temperature,minimum refinement function, composition, viscosity
+
+  set Time steps between mesh refinement = 3
+
+  subsection Minimum refinement function
+    set Function constants  =
+    set Function expression = if (depth > 2500000,6,if(depth > 660000,4,if(depth > 80000,5,6)))
+    set Variable names      = depth,y,z
+  end
+end
+
+subsection Heating model
+  set List of model names = constant heating, adiabatic heating #, shear heating
+  subsection Constant heating
+   set Radiogenic heating rate = 2.09e-12 # after Korenaga 2017
+  end
+
+  # subsection Shear heating
+  #   set Cohesion for maximum shear stress = 1e7
+  #   set Friction angle for maximum shear stress = 0.085
+  # end
+end
+
+# The parameters below this comment were created by the update script
+# as replacement for the old 'Model settings' subsection. They can be
+# safely merged with any existing subsections with the same name.
+
+subsection Boundary temperature model
+  set Fixed temperature boundary indicators   = 0,1
+end
+
+subsection Boundary velocity model
+  set Tangential velocity boundary indicators = 0
+end
+
+subsection Boundary velocity model
+  set Prescribed velocity boundary indicators = 1:gplates
+end
+
+subsection Boundary velocity model
+  subsection GPlates model
+    set Data directory = ./data/lat_lon_velocity_domain_180_360_muller2016/
+    set Velocity file name = velocity_%03d_Ma.gpml
+    set Data file time step = 1e6
+    set Decreasing file order = true    # decreasing the FileName
+    set First data file number = 200
+    set Lithosphere thickness  = 1e3
+  end
+end
+
+subsection Postprocess
+  set List of postprocessors = visualization,velocity statistics,temperature statistics,heat flux statistics, depth average, heating statistics, composition statistics
+
+  subsection Visualization
+    set Output format                 = vtu
+    set List of output variables      = nonadiabatic temperature,material properties,temperature anomaly
+    set Time between graphical output = 1e6
+    set Interpolate output            = true
+    set Number of grouped files       = 1
+
+    subsection Material properties
+      set List of material properties = density, specific heat, viscosity
+    end
+  end
+
+  subsection Depth average
+    set Time between graphical output = 1e7
+  end
+
+end
+
+
+subsection Solver parameters
+  subsection Stokes solver parameters
+    set Linear solver tolerance = 1e-4
+    set Number of cheap Stokes solver steps = 2000 # 200
+  end
+end
+
+subsection Solver parameters
+  subsection Stokes solver parameters
+    set Stokes solver type = block GMG
+  end
+end
